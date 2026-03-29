@@ -154,43 +154,22 @@ def monte_carlo_gbm(S0, mu, sigma, T=1.0, N=MC_STEPS, n_paths=MC_PATHS, seed=Non
         exp_term = (mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * Z[:, t - 1]
         S[:, t] = S[:, t - 1] * np.exp(np.clip(exp_term, -0.5, 0.5))
     return S
+
 def calcular_sistema_señales(prob_exito, retorno_esperado, vol, ml_pred, mom_score):
-    """
-    Versión Reajustada: Más equilibrada para acciones volátiles.
-    """
-    # 1. Puntuación por Probabilidad (Máx 45 pts)
-    # Si la prob es > 50%, ya empezamos a sumar fuerte
     score = (prob_exito - 40) * 1.5 
     score = np.clip(score, 0, 45)
-    
-    # 2. Puntuación por Retorno (Máx 40 pts)
-    # Cada 1% de retorno esperado suma 1.3 puntos
     score_retorno = np.clip(retorno_esperado * 1.3, -10, 40)
     score += score_retorno
-    
-    # 3. Ajuste por Riesgo (Volatilidad)
-    # En lugar de restar fijo, solo penalizamos si la vol es EXTREMA (>60%)
     if vol > 0.60:
         score -= (vol - 0.60) * 30
-    
-    # 4. Bonus por Alineación (Convergencia)
-    # Si el Machine Learning y el Momentum son positivos a la vez
     if ml_pred is not None and ml_pred > 0 and mom_score > 0:
         score += 15
-        
     score = np.clip(score, 0, 100)
-    
-    # --- NUEVOS UMBRALES REALISTAS ---
-    if score >= 85:
-        return score, "🚀 COMPRA FUERTE", "\033[1;32m" 
-    elif score >= 70:
-        return score, "✅ COMPRA", "\033[0;32m"       
-    elif score >= 50:
-        return score, "⚖️ NEUTRAL", "\033[0;33m" 
-    elif score >= 30:
-        return score, "⚠️ EVITAR", "\033[0;31m"    
-    else:
-        return score, "❌ VENTA", "\033[1;31m"
+    if score >= 85: return score, "🚀 COMPRA FUERTE", "\033[1;32m" 
+    elif score >= 70: return score, "✅ COMPRA", "\033[0;32m"       
+    elif score >= 50: return score, "⚖️ NEUTRAL", "\033[0;33m" 
+    elif score >= 30: return score, "⚠️ EVITAR", "\033[0;31m"    
+    else: return score, "❌ VENTA", "\033[1;31m"
 
 def main():
     ticker = input("Introduce la abreviatura del stock (ej. ASTS): ").strip().upper()
@@ -211,7 +190,8 @@ def main():
     mom_score, ret20, ret60 = indicador_momentum(adj)
     val_score, val_raw = puntuacion_valoracion(info)
 
-    predict_fun, coef, intercept = entrenamiento_ml_features(adj)
+    # FIX: Se añade vol_ann como argumento requerido
+    predict_fun, coef, intercept = entrenamiento_ml_features(adj, vol_ann)
     
     ml_pred = None
     if predict_fun is not None:
@@ -229,57 +209,72 @@ def main():
     mu_for_mc = RISK_FREE + combined_expected_return
     sigma_for_mc = vol_ann
 
-    # Simulación
     S = monte_carlo_gbm(S0, mu_for_mc, sigma_for_mc, T=1.0, N=MC_STEPS, n_paths=MC_PATHS)
     final_prices = S[:, -1]
     
-    # --- ESTADÍSTICAS ---
     precio_objetivo_mediano = np.median(final_prices)
-    conf_inf = np.percentile(final_prices, 15) # Límite inferior para el 70% de confianza
-    conf_sup = np.percentile(final_prices, 85) # Límite superior
-    
+    conf_inf, conf_sup = np.percentile(final_prices, [15, 85])
     prob_exito = np.mean(final_prices > S0) * 100
     retorno_est_pct = ((precio_objetivo_mediano - S0) / S0) * 100
-    
-    # MÉTRICA SOLICITADA: Pérdida Base (P15)
     perdida_base_p15 = abs((conf_inf / S0 - 1) * 100)
 
-    # --- SEÑALES ---
-    nota_final, señal, color = calcular_sistema_señales(
-        prob_exito, retorno_est_pct, vol_ann, ml_pred, mom_score
-    )
-    reset = "\033[0m"
-
-    # --- GRÁFICOS ---
+    # --- CONFIGURACIÓN GRÁFICA SOLICITADA ---
     plt.style.use('dark_background')
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
+
+    # Gráfico 1: Trayectorias
     t_axis = np.linspace(0, 1, MC_STEPS + 1)
     for i in range(min(100, S.shape[0])):
         ax1.plot(t_axis, S[i, :], linewidth=0.7, alpha=0.06, color='cyan')
-    ax1.axhline(conf_sup, color='lime', linestyle=':', label=f"Sup 70%: {conf_sup:.2f}€")
-    ax1.axhline(conf_inf, color='red', linestyle=':', label=f"Inf 70%: {conf_inf:.2f}€")
-    ax1.set_title(f"Escenarios MC para {ticker}")
-    ax1.legend(fontsize='small')
+    
+    ax1.axhline(conf_sup, color='lime', linestyle=':', alpha=0.6, label=f"Sup 70%: {conf_sup:.2f}€")
+    ax1.axhline(conf_inf, color='red', linestyle=':', alpha=0.6, label=f"Inf 70%: {conf_inf:.2f}€")
+    
+    # Líneas verticales trimestrales
+    for quarter in [0.25, 0.5, 0.75]:
+        ax1.axvline(quarter, color='gray', linestyle='--', linewidth=0.5, alpha=0.3)
 
-    ax2.hist(final_prices/S0-1, bins=80, alpha=0.8, color='royalblue', range=(-1, 3))
-    ax2.set_title(f"Distribución retornos — {ticker}")
+    ax1.set_title(f"Escenarios MC para {ticker} (Rango Operativo 70%)", fontsize=13)
+    ax1.set_xlabel("Horizonte Temporal (1 Año)")
+    ax1.set_ylabel("Precio Proyectado (€)")
+    ax1.legend(fontsize='small')
+    ax1.grid(True, alpha=0.15, linestyle='--')
+
+    # Gráfico 2: Histograma
+    final_returns = (final_prices / S0) - 1
+    ax2.hist(final_returns, bins=80, alpha=0.8, edgecolor='black', color='royalblue', range=(-1, 4))
+    ax2.axvline(np.mean(final_returns), color='red', linestyle='--', linewidth=2, label=f"Media MC: {np.mean(final_returns)*100:.2f}%")
+    ax2.axvline(conf_inf/S0 - 1, color='orange', linestyle=':', label="Intervalo de confianza")
+    ax2.axvline(conf_sup/S0 - 1, color='orange', linestyle=':')
+    
+    ax2.set_title(f"Distribución retornos finales — {ticker}")
+    ax2.set_xlabel("Retorno final (%)")
+    ax2.set_ylabel("Frecuencia")
+    ax2.legend()
+    ax2.grid(True, alpha=0.2)
+
     plt.tight_layout()
     plt.show()
 
     # --- REPORTE FINAL ---
+    nota_final, señal, color = calcular_sistema_señales(prob_exito, retorno_est_pct, vol_ann, ml_pred, mom_score)
+    reset = "\033[0m"
     print(f"\n" + "═"*50)
-    print(f" 📊  David Quant Stats: {ticker}")
+    print(f" 📊  David Quant Stats:           {ticker}")
     print(f" " + "═"*50)
-    print(f" Precio Actual:         {S0:.2f}€")
-    print(f" Objetivo Mediano:      {precio_objetivo_mediano:.2f}€ ({retorno_est_pct:+.2f}%)")
-    print(f" Volatilidad Anual:     {vol_ann*100:.1f}%")
-    print(f" Prob. de Éxito (>0%):  {prob_exito:.1f}%")
-    print(f" Pérdida Base (P15):   -{perdida_base_p15:.2f}%")
+    print(f" Precio Actual:                   {S0:.2f}€")
+    print(f" Objetivo Mediano:                {precio_objetivo_mediano:.2f}€ ({retorno_est_pct:+.2f}%)")
+    print(f" Volatilidad Anual:               {vol_ann*100:.1f}%")
+    print(f" Prob. de Éxito (>0%):            {prob_exito:.1f}%")
+    print(f" Pérdida Base (P15):              {perdida_base_p15:.2f}%")
     print(f" " + "─"*50)
-    print(f" PUNTUACIÓN:            {color}{nota_final:.1f} / 100{reset}")
-    print(f" SEÑAL TÉCNICA:         {color}{señal}{reset}")
+    print(f" PUNTUACIÓN:                      {color}{nota_final:.1f} / 100{reset}")
+    print(f" SEÑAL TÉCNICA:                   {color}{señal}{reset}")
     print(f" " + "─"*50)
-    print(f" Pasillo (70% conf):    [{conf_inf:.2f}€ - {conf_sup:.2f}€]")
-    print(f" ML Pred (5d):          {((ml_pred*100 if ml_pred else 0)):+.2f}%")
-    print(f" Momentum Score:        {mom_score:+.2f}")
+    print(f" Intervalo de confianza(70%):    [{conf_inf:.2f}€ - {conf_sup:.2f}€]")
+    print(f" ML Pred (5d):                    {((ml_pred*100 if ml_pred else 0)):+.2f}%")
+    print(f" Momentum Score:                  {mom_score:+.2f}")
     print("═"*50 + "\n")
+
+if __name__ == "__main__":
+    main()

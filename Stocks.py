@@ -259,11 +259,16 @@ def main():
     # --- REPORTE FINAL ---
     nota_final, señal, color = calcular_sistema_señales(prob_exito, retorno_est_pct, vol_ann, ml_pred, mom_score)
     reset = "\033[0m"
+    m_mc = np.mean(final_returns) * 100
+    s_mc = np.std(final_returns) * 100
+    
     print(f"\n" + "═"*50)
     print(f" 📊  David Quant Stats:           {ticker}")
     print(f" " + "═"*50)
     print(f" Precio Actual:                   {S0:.2f}$")
     print(f" Objetivo Mediano:                {precio_objetivo_mediano:.2f}$ ({retorno_est_pct:+.2f}%)")
+    print(f" Media retorno MC:                {m_mc:.2f}%")
+    print(f" Desviación Estándar MC:          {s_mc:.2f}%")
     print(f" Volatilidad Anual:               {vol_ann*100:.1f}%")
     print(f" Prob. de Éxito (>0%):            {prob_exito:.1f}%")
     print(f" Pérdida Base (P15):              {perdida_base_p15:.2f}%")

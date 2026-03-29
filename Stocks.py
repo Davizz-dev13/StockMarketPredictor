@@ -227,16 +227,16 @@ def main():
     for i in range(min(100, S.shape[0])):
         ax1.plot(t_axis, S[i, :], linewidth=0.7, alpha=0.06, color='cyan')
     
-    ax1.axhline(conf_sup, color='lime', linestyle=':', alpha=0.6, label=f"Sup 70%: {conf_sup:.2f}€")
-    ax1.axhline(conf_inf, color='red', linestyle=':', alpha=0.6, label=f"Inf 70%: {conf_inf:.2f}€")
-    
+    ax1.axhline(conf_sup, color='lime', linestyle=':', alpha=0.6, label=f"Sup 70%: {conf_sup:.2f}$")
+    ax1.axhline(conf_inf, color='red', linestyle=':', alpha=0.6, label=f"Inf 70%: {conf_inf:.2f}$")
+
     # Líneas verticales trimestrales
     for quarter in [0.25, 0.5, 0.75]:
         ax1.axvline(quarter, color='gray', linestyle='--', linewidth=0.5, alpha=0.3)
 
     ax1.set_title(f"Escenarios MC para {ticker} (Rango Operativo 70%)", fontsize=13)
     ax1.set_xlabel("Horizonte Temporal (1 Año)")
-    ax1.set_ylabel("Precio Proyectado (€)")
+    ax1.set_ylabel("Precio Proyectado ($)")
     ax1.legend(fontsize='small')
     ax1.grid(True, alpha=0.15, linestyle='--')
 
@@ -262,8 +262,8 @@ def main():
     print(f"\n" + "═"*50)
     print(f" 📊  David Quant Stats:           {ticker}")
     print(f" " + "═"*50)
-    print(f" Precio Actual:                   {S0:.2f}€")
-    print(f" Objetivo Mediano:                {precio_objetivo_mediano:.2f}€ ({retorno_est_pct:+.2f}%)")
+    print(f" Precio Actual:                   {S0:.2f}$")
+    print(f" Objetivo Mediano:                {precio_objetivo_mediano:.2f}$ ({retorno_est_pct:+.2f}%)")
     print(f" Volatilidad Anual:               {vol_ann*100:.1f}%")
     print(f" Prob. de Éxito (>0%):            {prob_exito:.1f}%")
     print(f" Pérdida Base (P15):              {perdida_base_p15:.2f}%")
@@ -271,7 +271,7 @@ def main():
     print(f" PUNTUACIÓN:                      {color}{nota_final:.1f} / 100{reset}")
     print(f" SEÑAL TÉCNICA:                   {color}{señal}{reset}")
     print(f" " + "─"*50)
-    print(f" Intervalo de confianza(70%):    [{conf_inf:.2f}€ - {conf_sup:.2f}€]")
+    print(f" Intervalo de confianza(70%):    [{conf_inf:.2f}$ - {conf_sup:.2f}$]")
     print(f" ML Pred (5d):                    {((ml_pred*100 if ml_pred else 0)):+.2f}%")
     print(f" Momentum Score:                  {mom_score:+.2f}")
     print("═"*50 + "\n")
